@@ -292,6 +292,22 @@ app.put('/expenses/:expenseId/tables/:tableName/rows/:rowId', async (req, res) =
 });
 
 
+app.get('/expenses/:expenseId/tables/:tableName/rows/:rowId', async (req, res) => {
+    try {
+        const { expenseId, tableName, rowId } = req.params;
+        const expense = await models.Expense.findById(expenseId);
+        const table = expense.tables.find((table) => table.tableName === tableName);
+
+        const row = table.rows.id(rowId);
+
+        res.status(200).json(row);
+    } catch (error) {
+        console.error('Error getting table row:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
 
 app.delete('/expenses/:expenseId/tables/:tableName/rows/:rowId', async (req, res) => {
     try {

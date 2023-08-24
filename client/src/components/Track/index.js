@@ -5,6 +5,7 @@ import Cookies from 'js-cookies';
 import LoaderSpinner from '../LoaderSpinner';
 import { FaEdit, FaTrash, FaSave, FaDownload, FaPlus } from 'react-icons/fa';
 import MyDocument from "../MyDocument";
+import axios from 'axios'
 
 
 import './index.css';
@@ -19,6 +20,9 @@ const Track = () => {
     const [date, setDate] = useState('')
     const [name, setName] = useState('')
     const [amount, setAmount] = useState('')
+
+    const [editRowData, setEditRowData] = useState({})
+    const [editId, setEditId] = useState('')
 
     const apiStatusConstants = {
         initial: 'INITIAL',
@@ -47,29 +51,35 @@ const Track = () => {
         );
     };
 
-    const handleEditRow = (monthIndex, tableIndex, rowIndex) => {
-        const editedRow = apiResponseData.data[monthIndex].tables[tableIndex].rows[rowIndex];
-        // Implement edit row logic
+    const handleEditRow = async (expenseId, tableName, rowId) => {
+        const response = await axios.get(`http://localhost:5100/expenses/${expenseId}/tables/${tableName}/rows/${rowId}`)
+        setEditRowData(response.data)
+        setEditId(rowId)
     };
 
-    
-  const handleDeleteRow = async (expenseId, tableName, rowId) => {
-    try {
-      const response = await fetch(`http://localhost:5100/expenses/${expenseId}/tables/${tableName}/rows/${rowId}`, {
-        method: 'DELETE'
-      });
+    const submitEditedRow = async (monthId,tableName,rowId) => {
+        const response = await axios.put(`http://localhost:5100/expenses/${monthId}/tables/${tableName}/rows/${rowId}`,editRowData)
+        getData()
+        setEditId('')
+    };
 
-      if (response.ok) {
-        const data = await response.json();
-        getData();
-      } else {
-        const errorData = await response.json();
-        alert(errorData)
-      }
-    } catch (error) {
-      alert('Error deleting table row:', error);
-    }
-  };
+    const handleDeleteRow = async (expenseId, tableName, rowId) => {
+        try {
+            const response = await fetch(`http://localhost:5100/expenses/${expenseId}/tables/${tableName}/rows/${rowId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                getData();
+            } else {
+                const errorData = await response.json();
+                alert(errorData)
+            }
+        } catch (error) {
+            alert('Error deleting table row:', error);
+        }
+    };
 
     const handleAddRow = async (month, table) => {
         const requestBody = {
@@ -102,56 +112,28 @@ const Track = () => {
         } catch (error) {
             alert('Error adding new row:', error);
         }
-
     };
-
-
-    // const exportPdfe = (month) => {
-    //     const blob = new Blob([<MyDocument month={month} />], { type: 'application/pdf' });
-    //     const url = URL.createObjectURL(blob);
-    //     const link = document.createElement('a');
-    //     link.href = url;
-    //     link.download = `${month.monthNumber}_${month.monthYear}_report.pdf`;
-    //     link.click();
-    //   };
 
     const exportPdfe = async (month) => {
-      // Send a request to the server to generate the PDF
-      try {
-        const response = await fetch('/generate-pdf');
-        if (response.ok) {
-          // Create a blob from the response
-          const blob = await response.blob();
-  
-          // Create a URL for the blob
-          const url = URL.createObjectURL(blob);
-  
-          // Initiate the download
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = 'report.pdf';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        } else {
-          console.error('Failed to generate PDF');
+        try {
+            const response = await fetch('/generate-pdf');
+            if (response.ok) {
+                const blob = await response.blob();
+
+                const url = URL.createObjectURL(blob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'report.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                console.error('Failed to generate PDF');
+            }
+        } catch (error) {
+            console.error('Error generating PDF:', error);
         }
-      } catch (error) {
-        console.error('Error generating PDF:', error);
-      }
-    };
-      
-
-    const calculateTotalIncome = (month) => {
-        // Implement calculation logic for total income
-    };
-
-    const calculateTotalExpense = (month) => {
-        // Implement calculation logic for total expense
-    };
-
-    const calculateCurrentSavings = (month) => {
-        // Implement calculation logic for current savings
     };
 
     const renderSuccessData = () => {
@@ -178,19 +160,55 @@ const Track = () => {
                                             <tr key={rowIndex}>
                                                 <td style={{ border: '1px solid #4f4f4f' }} className="bg-dark">
                                                     <div className="btn-group btn-table bg-dark">
-                                                        <button className="btn btn-outline-success btn-sm btn-table" style={{ borderRadius: '2px' }}>
+                                                        <button className="btn btn-outline-success btn-sm btn-table" style={{ borderRadius: '2px' }} onClick={() => { handleEditRow(month._id, table.tableName, row._id) }}>
                                                             <FaEdit />
                                                         </button>
-                                                        <button className="btn btn-outline-danger btn-sm btn-table" style={{ borderRadius: '2px' }} onClick={() => {handleDeleteRow(month._id,table.tableName,row._id)}}>
+                                                        <button className="btn btn-outline-danger btn-sm btn-table" style={{ borderRadius: '2px' }} onClick={() => { handleDeleteRow(month._id, table.tableName, row._id) }}>
                                                             <FaTrash />
                                                         </button>
                                                     </div>
                                                 </td>
-                                                <td className="text-light bg-dark">{row.date}</td>
-                                                <td className="text-light bg-dark">{row.name}</td>
-                                                <td className="text-light bg-dark">{row.amount}</td>
+                                                {editId != row._id ? <>
+                                                    <td className="text-light bg-dark">{row.date}</td>
+                                                    <td className="text-light bg-dark">{row.name}</td>
+                                                    <td className="text-light bg-dark">{row.amount}</td>
+                                                </> :
+                                                    <>
+                                                        <td className="bg-dark" style={{ border: "1px solid #4f4f4f" }}>
+                                                            <input
+                                                                className="form-control"
+                                                                type="text"
+                                                                value={editRowData.date}
+                                                                onChange={(e) => setEditRowData({ ...editRowData, date: e.target.value })}
+                                                            />
+                                                        </td>
+                                                        <td className="bg-dark" style={{ border: "1px solid #4f4f4f" }}>
+                                                            <input
+                                                                className="form-control"
+                                                                type="text"
+                                                                value={editRowData.name}
+                                                                onChange={(e) => setEditRowData({ ...editRowData, name: e.target.value })}
+                                                            />
+                                                        </td>
+                                                        <td className="bg-dark" style={{ border: "1px solid #4f4f4f" }}>
+                                                            <input
+                                                                className="form-control"
+                                                                type="text"
+                                                                value={editRowData.amount}
+                                                                onChange={(e) => setEditRowData({ ...editRowData, amount: e.target.value })}
+                                                            />
+                                                        </td>
+                                                        <td className="bg-dark" style={{ border: "1px solid #4f4f4f" }}>
+                                                            <button
+                                                                className="btn btn-outline-primary"
+                                                                onClick={() => {submitEditedRow(month._id,table.tableName,row._id)}}
+                                                            >
+                                                                Save
+                                                            </button>
+                                                        </td>
+                                                    </>
+                                                }
                                             </tr>
-
                                         ))}
                                         <tr>
                                             <td style={{ border: '1px solid #4f4f4f' }} className="bg-dark">
@@ -199,13 +217,13 @@ const Track = () => {
                                                 </button>
                                             </td>
                                             <td className="bg-dark" style={{ border: "1px solid #4f4f4f" }}>
-                                                <input className="form-control" value={rowMonthId === month._id && rowTableId === table._id? date:''} onChange={(e) => { setDate(e.target.value); setRowMonthId(month._id); setRowTableId(table._id) }} type="number" placeholder="Enter date" />
+                                                <input className="form-control" value={rowMonthId === month._id && rowTableId === table._id ? date : ''} onChange={(e) => { setDate(e.target.value); setRowMonthId(month._id); setRowTableId(table._id) }} type="number" placeholder="Enter date" />
                                             </td>
                                             <td className="bg-dark" style={{ border: "1px solid #4f4f4f" }}>
-                                                <input className="form-control" value={rowMonthId === month._id && rowTableId === table._id? name:''} onChange={(e) => { setName(e.target.value) ; setRowMonthId(month._id); setRowTableId(table._id) }} type="text" placeholder="Enter name" />
+                                                <input className="form-control" value={rowMonthId === month._id && rowTableId === table._id ? name : ''} onChange={(e) => { setName(e.target.value); setRowMonthId(month._id); setRowTableId(table._id) }} type="text" placeholder="Enter name" />
                                             </td>
                                             <td className="bg-dark" style={{ border: "1px solid #4f4f4f" }}>
-                                                <input className="form-control" value={rowMonthId === month._id && rowTableId === table._id? amount:''} onChange={(e) => { setAmount(e.target.value); setRowMonthId(month._id); setRowTableId(table._id) }} type="number" placeholder="Enter amount" />
+                                                <input className="form-control" value={rowMonthId === month._id && rowTableId === table._id ? amount : ''} onChange={(e) => { setAmount(e.target.value); setRowMonthId(month._id); setRowTableId(table._id) }} type="number" placeholder="Enter amount" />
                                             </td>
                                         </tr>
                                     </tbody>
@@ -238,7 +256,7 @@ const Track = () => {
                                 </tbody>
                             </table>
                             <div className="w-100 d-flex justify-content-end mb-4 mt-2">
-                                <button className="btn btn-outline-success" onClick={() => {exportPdfe(month)}}>
+                                <button className="btn btn-outline-success" onClick={() => { exportPdfe(month) }}>
                                     <FaDownload /> Download PDF
                                 </button>
                             </div>
@@ -270,6 +288,7 @@ const Track = () => {
             const response = await fetch(`${api}/${userId}`, options);
             if (response.ok) {
                 const data = await response.json();
+                console.log(data)
                 setApiResponseData({ ...apiResponseData, status: apiStatusConstants.success, data });
             } else if (response.status === 401) {
                 setApiResponseData({ ...apiResponseData, status: apiStatusConstants.failure, errMsg: 'Unauthorized user!' });
@@ -299,9 +318,7 @@ const Track = () => {
     }, []);
 
 
-    const submitEditedRow = (monthId, tableName, rowId, row) => {
-        // Implement the submit edited row logic here
-    };
+    
 
 
 
